@@ -1,4 +1,4 @@
-# Safely Build Your Django Website
+# Build Your Django Website from 0
 
 ---
 In this tutorial, you will learn:
@@ -6,9 +6,7 @@ In this tutorial, you will learn:
 - Configure ssh connection on the server
 - How to develop a simply django back-end application 
 - How to use Vue3 to build a simple front-end project
-- How to connect your front-end, backend and database together
 - How to configure and use Nginx in your front-end
-- How to use Gunicorn to replace Django's built-in WSGIServer
 
 ---
 ## How to own and configure your server using Droplets:
@@ -104,7 +102,7 @@ INSTALLED_APPS = [
 ]
 ```
 
-Then we want to create a serializer for our model. The reason why we need a serializer is because our backend end program will only do things like receive data from the frontend and pass data to the backend. During this process, we want to make sure the front and back end can exchange data in some form. We need a special mechanism to put python data. For example, lists and dicts are converted into a data format that the front-end can recognize directly. This is why we need to serialize and deserialize our data. In fact, our backend is mainly doing 2 things: serialize and deserialize. That's why we encapsulate a specialized serializer to do this.
+Then we want to create a serializer for our model. The reason why we need a serializer is because our backend program will only do things like receive data from the frontend and pass data to the backend. During this process, we want to make sure the front and back end can exchange data in some form. We need a special mechanism to put python data. For example, lists and dicts are converted into a data format that the front-end can recognize directly. This is why we need to serialize and deserialize our data. In fact, our backend is mainly doing 2 things: serialize and deserialize. That's why we encapsulate a specialized serializer to do this.
 
 So we need to create a serializers.py under our app school's directory:
 ![serializers.py](https://i.imgur.com/DafzKux.png)
@@ -199,8 +197,44 @@ First, if there's no node.js on your computer, you should install it first:
 
     To keep it simple, here I'll just create a simple page which can display all student's names provided by our backend, you may need more functions and pages for your frontend.
 
-    Let's edit our App.vue with some chatGPT codes:
-    ![code](https://i.imgur.com/GVuTLNf.png) 
+    Let's edit our App.vue with some chatGPT codes for scripts:
+    ```javascript
+    import axios from 'axios';
+
+    export default {
+    name: 'App',
+    data() {
+        return {
+        names: []
+        };
+    },
+    mounted() {
+        this.fetchNames();
+    },
+    methods: {
+        async fetchNames() {
+        try {
+            const response = await axios.get('http://127.0.0.1:8000/school/names/');
+            this.names = response.data;
+        } catch (error) {
+            console.error('An error occurred while fetching the names:', error);
+        }
+        }
+    }
+    };
+    ```
+    And the html template:
+    ```html
+    <template>
+    <div>
+        <img alt="Vue logo" src="./assets/logo.png">
+        <h1>All Names:</h1>
+        <ul>
+        <li v-for="name in names" :key="name">{{ name }}</li>
+        </ul>
+    </div>
+    </template>
+    ```
     then use command:
     ``` 
     npm run serve
@@ -215,7 +249,7 @@ First, if there's no node.js on your computer, you should install it first:
     That's because there's something called **Same-origin Policy**: Browsers implement this security measure to prevent malicious sites from making unauthorized requests to a different site. It restricts web pages from making requests to a different domain than the one that served the web page.
     To solve this, we can use **CORS (Cross-Origin Resource Sharing)** technolohy. In order to realize that, we should do some configurations at our backend.
 
-8. Add CORS settings to a Django project:
+8. Add CORS settings to our **Django** project:
     - Modify Your settings.py File:
     ```python
         INSTALLED_APPS = [
@@ -234,8 +268,121 @@ First, if there's no node.js on your computer, you should install it first:
     - Configure CORS Settings:
     ```python
         CORS_ALLOWED_ORIGINS = [
-            'http://localhost:3000',
+            'http://localhost:8080',
             'https://example.com',
         ]
     ```
-    
+    After these steps, we can now visit our vue3 project and open the webpage. If everythings is correct, we are supposed to see this page:
+    ![correctpage](https://i.imgur.com/GYWPzMF.png)
+
+    This means our frontend and backend can communicate with each other smoothly. 
+
+    Our frontend's project file structure is:
+    ![FrontStruct](https://i.imgur.com/o4OQ570.png)
+    And our backend's file structure is:
+    ![](https://i.imgur.com/S1ZrZwD.png)
+
+
+    Before we talk about Nginx and Gunoiorn, you may want to upload your existed codes to github to keep it safe. Before doing that, please make sure that all your sensitive information (password and secretkey) is replaced with environment variables and your environment variables files( if it exist) are added to the .gitignore file like this:
+    ```python
+        SECRET_KEY = "django-insecure-o6w@a46mx..." #replace this line
+    ```
+    And replace it with :
+    ```python
+    import os
+
+    # ...
+
+    try:
+        SECRET_KEY = os.environ["SECRET_KEY"]
+    except KeyError as e:
+        raise RuntimeError("Could not find a SECRET_KEY in environment") from e
+    ```
+
+    In this case you have to set all those environment variables on your server, and for the later steps, we can use github repo secrets when we use git workflow to build the docker containers.
+
+    Or you can keep them as a file with installing:
+    ```python
+    pip install python-decouple
+    ```
+    and use this library in your settings.py:
+    ```python
+    from decouple import config,Csv
+    ...
+
+    SECRET_KEY = config('SECRET_KEY')
+    ALLOWED_HOSTS =  config('ALLOWED_HOSTS', cast=Csv())
+    ```
+    And load all those secrets in your .env file, and add it to your .gitignore file.
+
+    ---
+
+    ## Nginx and Cunicorn
+
+    So far we've already had a separate project for frontend and backend. They can work perfectly on local. But there are more steps needed to be done if we want to make it visitable on our server.
+
+    So you may have a question, why we need Nginx and Gunicorn? 
+
+    ### What is Nginx?
+    ![Nginx](https://i.imgur.com/QvuSCox.jpg)
+    Nginx  is a lightweight web server, reverse proxy server, and email (IMAP/POP3) proxy server. There are many advantages for using Nginx, you can check them by yourself. But in this article, we just use it in a pretty basic way. To install the nginx on your platform, you can follow the following tutorial:
+  
+
+    [Nginx Install](https://www.nginx.com/resources/wiki/start/topics/tutorials/install/)
+
+    Once the Nginx is installed, we can test it by command:
+    ```shell
+    sudo nginx -t
+    ```
+    And if everything goes well, you should see a welocome page offered by Nginx with command:
+
+    ```
+    sudo nginx
+    ```
+
+    To make nginx useable, we need to make some changes to nginx.conf. This configuration file is loacted variously on different platforms so you may need to check its path on your own equipment.
+
+    After making sure Nginx is successfully installed, we can open `nginx.conf` and edit it:
+    ```
+    server {
+    listen 80; # Listen on port 80 for HTTP
+    server_name http://localhost;
+    return 301 https://$host$request_uri;
+    access_log /var/log/nginx/chenyu-site-http-access.log;
+    error_log /var/log/nginx/chenyu-site-http-error.log;
+
+    location / {
+        root /usr/share/nginx/html/dist;
+        try_files $uri $uri/ /index.html;
+       
+        }
+    }
+    ```
+    set the limit of connections
+    ```
+    worker_processes auto;
+
+    events {
+        worker_connections 1024;
+    }
+    ```
+
+    After done setting, we are able to use Nginx to proxy our frontend! We should place all our static files in a certain directory and then specify the folder to be accessed by nginx. So our next step is to package all our frontend stuffs and place this under specific path which is available for Nginx. We need to add:
+    ```javascript
+    module.exports = {
+        ...#
+        assetsDir: "static",
+        ...#
+        }
+    ```
+    in the `vue.config.js`to aquire a pure static folder and make all static files(frontend's codes) inside it.
+    Then we can build the entire project with command:
+    ```
+    npm run build
+    ```
+    After that, we can see there's a newly created directory named `dist` in our frontend's root directory. we move this `/dist` file to the specific location we set in our Nginx's nginx.conf file. 
+
+    After that, we can try to restart Nginx service and visit our website's frontend successfully.
+
+
+
